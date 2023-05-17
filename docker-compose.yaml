@@ -91,7 +91,7 @@ services:
     ports:
       - 5555:5555
 
-frontend:
+  frontend:
     image: ghcr.io/avansoft/flickit-platform-frontend:vi0.7.3
     ports:
       - "80:80"
