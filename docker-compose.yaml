@@ -54,8 +54,6 @@ services:
     restart: always
     image: ghcr.io/avansoft/flickit-platform:stage
     command: celery -A assessmentplatform worker -l info
-    volumes:
-      - ./backend:/backend
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - DEBUG=${DEBUG}
@@ -81,8 +79,6 @@ services:
   flower:
     image: ghcr.io/avansoft/flickit-platform:stage
     command: celery -A assessmentplatform flower
-    volumes:
-      - ./backend:/backend
     depends_on:
       - backend
       - redis
@@ -104,14 +100,25 @@ services:
   frontend:
     image: ghcr.io/avansoft/flickit-platform-frontend:stage
     ports:
-      - "80:80"
+      - "3000:3000"
     environment:
       - BASE_URL=http://backend:8000
     stdin_open: true
     depends_on:
       - backend
 
+  nginx:
+    image: nginx:latest
+    ports:
+      - 80:80
+    volumes:
+      - nginx-config:/etc/nginx
+    depends_on:
+      - backend
+      - frontend
+
 volumes:
   postgres-data:
   static-data:
   dsl-parser-data:
+  nginx-config:
