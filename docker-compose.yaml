@@ -1,6 +1,7 @@
 version: '3.9'
 
 services:
+
   backend:
     image: ghcr.io/avansoft/flickit-platform:stage
     ports:
@@ -8,6 +9,7 @@ services:
     volumes:
       - static-data:/vol/web
     environment:
+      - ASSESSMENT_SERVER_PORT=${ASSESSMENT_SERVER_PORT}
       - SECRET_KEY=${SECRET_KEY}
       - DEBUG=${DEBUG}
       - DB_HOST=db
@@ -27,7 +29,38 @@ services:
 
     depends_on:
       - db
+      - assessment
 
+
+
+  assessment:
+    image: ghcr.io/avansoft/flickit-assessment-core:0.1.0
+    environment:
+      - SERVER_PORT=${ASSESSMENT_SERVER_PORT}
+      - SERVER_SERVLET_CONTEXT-PATH=/assessment-core/api/
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db_core:5432/${ASSESSMENT_DB_NAME}  
+      - SPRING_DATASOURCE_USERNAME=${ASSESSMENT_DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${ASSESSMENT_DB_PASS}
+      - MANAGEMENT_ENDPOINT_HEALTH_SHOW-DETAILS=always
+      - APP_FLICKIT-PLATFORM_REST_BASE-URL=http://backend:8000
+    ports:
+      - 8098:${ASSESSMENT_SERVER_PORT}
+    depends_on:
+      - assessment_db
+
+
+  assessment_db:
+    image: postgres:11
+    hostname: db_core
+    restart: always
+    environment:
+      - POSTGRES_DB=${ASSESSMENT_DB_NAME}
+      - POSTGRES_USER=${ASSESSMENT_DB_USER}
+      - POSTGRES_PASSWORD=${ASSESSMENT_DB_PASS}
+    volumes:
+      - assessment-db-data:/var/lib/postgresql/data
+    ports:
+      - 5433:5432
   dsl:
     image: ghcr.io/avansoft/flickit-dsl-parser:0.2.4
     restart: on-failure
@@ -112,13 +145,14 @@ services:
     ports:
       - 80:80
     volumes:
-      - nginx-config:/etc/nginx
+      - ./nginx-config/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - backend
       - frontend
+
 
 volumes:
   postgres-data:
   static-data:
   dsl-parser-data:
-  nginx-config:
+  assessment-db-data:
