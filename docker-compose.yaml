@@ -3,7 +3,7 @@ version: '3.9'
 services:
 
   backend:
-    image: ghcr.io/avansoft/flickit-platform:stage
+    image: ghcr.io/avansoft/flickit-platform:latest
     ports:
       - 8000:8000
     volumes:
@@ -26,15 +26,25 @@ services:
       - EMAIL_USE_SSL=${EMAIL_USE_SSL}
       - DOMAIN=${DOMAIN}
       - CELERY_BROKER_URL=redis://redis:6379/1
+      - MINIO_ACCESS_KEY_ID=${MINIO_USER}
+      - MINIO_SECRET_ACCESS_KEY=${MINIO_PASSWORD}
+      - MINIO_URL=http://localhost:9000
+      - MINIO_API=http://minio:9000
+      - MINIO_USE_SSL=${MINIO_USE_SSL}
+      - MINIO_MEDIA_BUCKET=${MINIO_MEDIA_BUCKET}
+      - MINIO_STATIC_BUCKET=${MINIO_STATIC_BUCKET}
+      - MINIO_QUERYSTRING_EXPIRE_MEDIA=${MINIO_QUERYSTRING_EXPIRE_MEDIA}
 
     depends_on:
+      - minio
+      - createbucket
       - db
       - assessment
 
 
 
   assessment:
-    image: ghcr.io/avansoft/flickit-assessment-core:0.1.0
+    image: ghcr.io/avansoft/flickit-assessment-core:latest
     environment:
       - SERVER_PORT=${ASSESSMENT_SERVER_PORT}
       - SERVER_SERVLET_CONTEXT-PATH=/assessment-core/api/
@@ -62,7 +72,7 @@ services:
     ports:
       - 5433:5432
   dsl:
-    image: ghcr.io/avansoft/flickit-dsl-parser:0.2.4
+    image: ghcr.io/avansoft/flickit-dsl-parser:latest
     restart: on-failure
     ports:
       - 8080:8080
@@ -131,9 +141,9 @@ services:
       - 5555:5555
 
   frontend:
-    image: ghcr.io/avansoft/flickit-platform-frontend:stage
+    image: ghcr.io/avansoft/flickit-platform-frontend:latest
     ports:
-      - "3000:3000"
+      - "3000:80"
     environment:
       - BASE_URL=http://backend:8000
     stdin_open: true
@@ -150,9 +160,35 @@ services:
       - backend
       - frontend
 
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_storage:/data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+    command: server --console-address ":9001" /data
+
+  createbucket:
+    image: minio/mc:latest
+    restart: on-failure
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc config host add --api s3v4 s3 http://minio:9000 $MINIO_USER  $MINIO_PASSWORD;
+      /usr/bin/mc mb s3/$MINIO_STATIC_BUCKET/;
+      /usr/bin/mc mb s3/$MINIO_MEDIA_BUCKET/;
+      /usr/bin/mc anonymous set download s3/$MINIO_STATIC_BUCKET;
+      "
+
 
 volumes:
   postgres-data:
   static-data:
   dsl-parser-data:
   assessment-db-data:
+  minio_storage: 
